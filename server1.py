@@ -54,6 +54,38 @@ def init_db():
 # Initialize the database when the server starts
 init_db()
 
+def migrate_database():
+    """Migrate the existing database to include the new status and completed_at columns"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if the status column already exists
+        cursor.execute("PRAGMA table_info(list_items)")
+        columns = cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        
+        if 'status' not in column_names:
+            print("Adding 'status' column to list_items table...")
+            cursor.execute("ALTER TABLE list_items ADD COLUMN status TEXT DEFAULT 'active'")
+        else:
+            print("Column 'status' already exists.")
+            
+        if 'completed_at' not in column_names:
+            print("Adding 'completed_at' column to list_items table...")
+            cursor.execute("ALTER TABLE list_items ADD COLUMN completed_at TIMESTAMP")
+        else:
+            print("Column 'completed_at' already exists.")
+            
+        conn.commit()
+        print("Migration completed successfully!")
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"Error during migration: {str(e)}")
+        return False
+    finally:
+        conn.close()
 
 
 @mcp.tool()
@@ -233,5 +265,10 @@ def complete_list_item(channel_id: str, list_name: str, item_name: str) -> str:
         conn.close()
 
 if __name__ == "__main__":
-    # mcp.run()
-    mcp.run(transport="sse", host="0.0.0.0", port=8001)
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "migrate":
+        # Run migration if requested
+        migrate_database()
+    else:
+        # Otherwise run the server
+        mcp.run(transport="sse", host="0.0.0.0", port=8001)
