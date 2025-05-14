@@ -69,18 +69,23 @@ def create_list(channel_id: str, list_name: str) -> str:
         conn.close()
 
 @mcp.tool()
-def add_list_item(list_id: int, item_name: str) -> str:
-    """Adds an item to an existing list"""
+def add_list_item(channel_id: str, list_name: str, item_name: str) -> str:
+    """Adds an item to an existing list identified by channel_id and list_name"""
     conn = sqlite3.connect('lists.db')
     cursor = conn.cursor()
     
     try:
-        # Check if the list exists
-        cursor.execute("SELECT name FROM lists WHERE id = ?", (list_id,))
+        # Find the list by channel_id and list_name
+        cursor.execute(
+            "SELECT id, name FROM lists WHERE channel_id = ? AND name = ?", 
+            (channel_id, list_name)
+        )
         list_result = cursor.fetchone()
         
         if not list_result:
-            return f"List with ID {list_id} not found"
+            return f"List '{list_name}' not found in channel {channel_id}"
+        
+        list_id, list_name = list_result
         
         # Insert the new item into the list_items table
         cursor.execute(
@@ -88,7 +93,7 @@ def add_list_item(list_id: int, item_name: str) -> str:
             (list_id, item_name)
         )
         conn.commit()
-        return f"Added '{item_name}' to list '{list_result[0]}'"
+        return f"Added '{item_name}' to list '{list_name}' in channel {channel_id}"
     except Exception as e:
         conn.rollback()
         return f"Error adding item to list: {str(e)}"
