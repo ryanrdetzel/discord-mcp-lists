@@ -8,5 +8,5 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - ./lists.db:/app/lists.db
+      - ./data:/app/data
     restart: unless-stopped

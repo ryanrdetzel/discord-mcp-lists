@@ -6,13 +6,19 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("Demo 🚀")
 
+# Define database path
+DATA_DIR = os.path.join(os.getcwd(), 'data')
+# Create data directory if it doesn't exist
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, 'lists.db')
+
 def init_db():
     """Initialize the SQLite database if it doesn't exist"""
     # Check if database file exists
-    db_exists = os.path.exists('lists.db')
+    db_exists = os.path.exists(DB_PATH)
     
     # Connect to database (creates it if it doesn't exist)
-    conn = sqlite3.connect('lists.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     # Create tables if they don't exist
@@ -51,7 +57,7 @@ init_db()
 @mcp.tool()
 def add_list_item(channel_id: str, list_name: str, item_name: str) -> str:
     """Adds an item to a list identified by channel_id and list_name. Creates the list if it doesn't exist."""
-    conn = sqlite3.connect('lists.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
@@ -94,7 +100,7 @@ def add_list_item(channel_id: str, list_name: str, item_name: str) -> str:
 @mcp.tool()
 def get_lists(channel_id: str = None) -> str:
     """Gets all lists, optionally filtered by channel_id"""
-    conn = sqlite3.connect('lists.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
@@ -125,7 +131,7 @@ def get_lists(channel_id: str = None) -> str:
 @mcp.tool()
 def get_list_items(channel_id: str, list_name: str) -> str:
     """Gets all items for a specific list identified by channel_id and list_name"""
-    conn = sqlite3.connect('lists.db')
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
