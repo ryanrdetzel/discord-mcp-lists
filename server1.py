@@ -47,30 +47,10 @@ def init_db():
 init_db()
 
 
-@mcp.tool()
-def create_list(channel_id: str, list_name: str) -> str:
-    """Creates a new list for a channel"""
-    conn = sqlite3.connect('lists.db')
-    cursor = conn.cursor()
-    
-    try:
-        # Insert the new list into the database
-        cursor.execute(
-            "INSERT INTO lists (channel_id, name) VALUES (?, ?)",
-            (channel_id, list_name)
-        )
-        list_id = cursor.lastrowid
-        conn.commit()
-        return f"{list_name} created in channel {channel_id} with ID {list_id}"
-    except Exception as e:
-        conn.rollback()
-        return f"Error creating list: {str(e)}"
-    finally:
-        conn.close()
 
 @mcp.tool()
 def add_list_item(channel_id: str, list_name: str, item_name: str) -> str:
-    """Adds an item to an existing list identified by channel_id and list_name"""
+    """Adds an item to a list identified by channel_id and list_name. Creates the list if it doesn't exist."""
     conn = sqlite3.connect('lists.db')
     cursor = conn.cursor()
     
@@ -82,10 +62,17 @@ def add_list_item(channel_id: str, list_name: str, item_name: str) -> str:
         )
         list_result = cursor.fetchone()
         
+        # If list doesn't exist, create it
         if not list_result:
-            return f"List '{list_name}' not found in channel {channel_id}"
-        
-        list_id, list_name = list_result
+            cursor.execute(
+                "INSERT INTO lists (channel_id, name) VALUES (?, ?)",
+                (channel_id, list_name)
+            )
+            list_id = cursor.lastrowid
+            list_created = True
+        else:
+            list_id, list_name = list_result
+            list_created = False
         
         # Insert the new item into the list_items table
         cursor.execute(
@@ -93,7 +80,11 @@ def add_list_item(channel_id: str, list_name: str, item_name: str) -> str:
             (list_id, item_name)
         )
         conn.commit()
-        return f"Added '{item_name}' to list '{list_name}' in channel {channel_id}"
+        
+        if list_created:
+            return f"Created list '{list_name}' in channel {channel_id} and added '{item_name}'"
+        else:
+            return f"Added '{item_name}' to list '{list_name}' in channel {channel_id}"
     except Exception as e:
         conn.rollback()
         return f"Error adding item to list: {str(e)}"
