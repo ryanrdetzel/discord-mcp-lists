@@ -122,6 +122,48 @@ def get_lists(channel_id: str = None) -> str:
     finally:
         conn.close()
 
+@mcp.tool()
+def get_list_items(channel_id: str, list_name: str) -> str:
+    """Gets all items for a specific list identified by channel_id and list_name"""
+    conn = sqlite3.connect('lists.db')
+    cursor = conn.cursor()
+    
+    try:
+        # Find the list by channel_id and list_name
+        cursor.execute(
+            "SELECT id FROM lists WHERE channel_id = ? AND name = ?", 
+            (channel_id, list_name)
+        )
+        list_result = cursor.fetchone()
+        
+        if not list_result:
+            return f"List '{list_name}' not found in channel {channel_id}"
+        
+        list_id = list_result[0]
+        
+        # Get all items for this list
+        cursor.execute(
+            "SELECT name, created_at FROM list_items WHERE list_id = ? ORDER BY created_at",
+            (list_id,)
+        )
+        items = cursor.fetchall()
+        
+        if not items:
+            return f"No items found in list '{list_name}'"
+        
+        result = f"Items in list '{list_name}':\n"
+        for i, (item_name, created_at) in enumerate(items, 1):
+            # Format the timestamp for better readability
+            created_time = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            formatted_time = created_time.strftime("%Y-%m-%d %H:%M:%S")
+            result += f"{i}. {item_name} (added: {formatted_time})\n"
+        
+        return result.strip()
+    except Exception as e:
+        return f"Error retrieving list items: {str(e)}"
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     # mcp.run()
