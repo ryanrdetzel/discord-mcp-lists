@@ -39,7 +39,9 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             list_id INTEGER NOT NULL,
             name TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
             FOREIGN KEY (list_id) REFERENCES lists (id)
         )
         ''')
@@ -129,8 +131,9 @@ def get_lists(channel_id: str = None) -> str:
         conn.close()
 
 @mcp.tool()
-def get_list_items(channel_id: str, list_name: str) -> str:
-    """Gets all items for a specific list identified by channel_id and list_name"""
+def get_list_items(channel_id: str, list_name: str, show_completed: bool = False) -> str:
+    """Gets all items for a specific list identified by channel_id and list_name. 
+    By default only shows active items, set show_completed=True to see completed items too."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -148,21 +151,33 @@ def get_list_items(channel_id: str, list_name: str) -> str:
         list_id = list_result[0]
         
         # Get all items for this list
-        cursor.execute(
-            "SELECT name, created_at FROM list_items WHERE list_id = ? ORDER BY created_at",
-            (list_id,)
-        )
+        if show_completed:
+            cursor.execute(
+                "SELECT name, created_at, status, completed_at FROM list_items WHERE list_id = ? ORDER BY created_at",
+                (list_id,)
+            )
+        else:
+            cursor.execute(
+                "SELECT name, created_at, status, completed_at FROM list_items WHERE list_id = ? AND status = 'active' ORDER BY created_at",
+                (list_id,)
+            )
         items = cursor.fetchall()
         
         if not items:
             return f"No items found in list '{list_name}'"
         
         result = f"Items in list '{list_name}':\n"
-        for i, (item_name, created_at) in enumerate(items, 1):
+        for i, (item_name, created_at, status, completed_at) in enumerate(items, 1):
             # Format the timestamp for better readability
             created_time = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
             formatted_time = created_time.strftime("%Y-%m-%d %H:%M:%S")
-            result += f"{i}. {item_name} (added: {formatted_time})\n"
+            
+            if status == 'completed' and completed_at:
+                completed_time = datetime.datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                formatted_completed = completed_time.strftime("%Y-%m-%d %H:%M:%S")
+                result += f"{i}. {item_name} ✓ (added: {formatted_time}, completed: {formatted_completed})\n"
+            else:
+                result += f"{i}. {item_name} (added: {formatted_time})\n"
         
         return result.strip()
     except Exception as e:
@@ -170,6 +185,52 @@ def get_list_items(channel_id: str, list_name: str) -> str:
     finally:
         conn.close()
 
+
+@mcp.tool()
+def complete_list_item(channel_id: str, list_name: str, item_name: str) -> str:
+    """Marks a list item as completed instead of deleting it"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Find the list by channel_id and list_name
+        cursor.execute(
+            "SELECT id FROM lists WHERE channel_id = ? AND name = ?", 
+            (channel_id, list_name)
+        )
+        list_result = cursor.fetchone()
+        
+        if not list_result:
+            return f"List '{list_name}' not found in channel {channel_id}"
+        
+        list_id = list_result[0]
+        
+        # Find the item by name in the specified list
+        cursor.execute(
+            "SELECT id, status FROM list_items WHERE list_id = ? AND name = ? AND status = 'active'",
+            (list_id, item_name)
+        )
+        item_result = cursor.fetchone()
+        
+        if not item_result:
+            return f"Active item '{item_name}' not found in list '{list_name}'"
+        
+        item_id = item_result[0]
+        
+        # Mark the item as completed with current timestamp
+        current_time = datetime.datetime.now().isoformat()
+        cursor.execute(
+            "UPDATE list_items SET status = 'completed', completed_at = ? WHERE id = ?",
+            (current_time, item_id)
+        )
+        conn.commit()
+        
+        return f"Marked '{item_name}' as completed in list '{list_name}'"
+    except Exception as e:
+        conn.rollback()
+        return f"Error completing list item: {str(e)}"
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     # mcp.run()
