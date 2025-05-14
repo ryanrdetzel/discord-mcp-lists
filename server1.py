@@ -167,4 +167,4 @@ def get_list_items(channel_id: str, list_name: str) -> str:
 
 if __name__ == "__main__":
     # mcp.run()
-    mcp.run(transport="sse", host="127.0.0.1", port=8001)
+    mcp.run(transport="sse", host="0.0.0.0", port=8001)
